@@ -19,7 +19,7 @@ struct call_info {
     uint64_t time_usec; // the highest bit represent enter or exit
 };
 
-static struct call_info* call_chain;
+static struct call_info* call_records;
 static unsigned ptr = 0;
 
 static uint64_t now(void) {
@@ -30,32 +30,32 @@ static uint64_t now(void) {
 
 void __attribute__((constructor)) traceBegin(void) {
     fprintf(stderr, "start profiling, build "__DATE__" "__TIME__"\n");
-    call_chain = malloc(sizeof(struct call_info) * MAX_LENGTH);
+    call_records = malloc(sizeof(struct call_info) * MAX_LENGTH);
 }
 
 void __attribute__((destructor)) traceEnd(void) {
     // read function name
     FILE* f = fopen("a.profile", "w");
     if (f) {
-        fwrite(call_chain, 1, sizeof(struct call_info) * ptr, f);
+        fwrite(call_records, 1, sizeof(struct call_info) * ptr, f);
         fclose(f);
         fprintf(stderr, "end profiling, checkout a.profile\n");
     } else {
         perror("end profiling, can't open file to save");
     }
-    free(call_chain);
+    free(call_records);
 }
 
 void __cyg_profile_func_enter(void *func, void *caller) {
     //fprintf(stderr, "enter func: %s father: %s\n", func2name(func), func2name(caller));
-    struct call_info* info = &call_chain[ptr++];
+    struct call_info* info = &call_records[ptr++];
     info->func = func;
     info->time_usec = (1ULL << 63) & now();
 }
 
 void __cyg_profile_func_exit(void *func, void *caller) {
     //fprintf(stderr, "exit func: %s father: %s\n", func2name(func), func2name(caller));
-    struct call_info* info = &call_chain[ptr++];
+    struct call_info* info = &call_records[ptr++];
     info->func = func;
     info->time_usec = now();
 }

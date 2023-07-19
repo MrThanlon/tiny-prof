@@ -1,3 +1,7 @@
 test
 *.o
 a.profile
+compile_commands.json
+.cache
+.vscode
+
