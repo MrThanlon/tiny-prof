@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 #define _GNU_SOURCE
 #define __USE_GNU
@@ -20,7 +21,7 @@ struct call_info {
 };
 
 static struct call_info* call_records;
-static unsigned ptr = 0;
+static uint32_t ptr = 0;
 
 static uint64_t now(void) {
     struct timeval tv;
@@ -34,9 +35,32 @@ void __attribute__((constructor)) traceBegin(void) {
 }
 
 void __attribute__((destructor)) traceEnd(void) {
-    // read function name
     FILE* f = fopen("a.profile", "w");
     if (f) {
+        // name-addr table
+        uint32_t tb_len = 0;
+        long data_begin_pos = 0;
+        fseek(f, 4, SEEK_SET);
+        for (uint32_t i = 0; i < ptr; i++) {
+            for (uint32_t j = 0; j < i; j++) {
+                if (call_records[i].func == call_records[j].func) {
+                    // exist, ignore
+                    goto ignore;
+                }
+            }
+            // add a enity
+            fwrite(&call_records[i].func, 1, sizeof(void*), f);
+            const char* name = func2name(call_records[i].func);
+            fwrite(name, 1, strlen(name) + 1, f);
+            tb_len += 1;
+            ignore:
+            continue;
+        }
+        data_begin_pos = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        fwrite(&tb_len, 1, 4, f);
+        fseek(f, data_begin_pos, SEEK_SET);
+        // records
         fwrite(call_records, 1, sizeof(struct call_info) * ptr, f);
         fclose(f);
         fprintf(stderr, "end profiling, checkout a.profile\n");
