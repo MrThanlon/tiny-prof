@@ -69,7 +69,6 @@ const functions = ['main', 'traceBegin']
     <div class="file card">
       <button @click="selectFile(openProfile)">Open profile</button>
       <button @click="selectFile(addSymbols)">Add symbols</button>
-      <button @click="profile.push('cool')">test</button>
     </div>
     <div class="functions card">
       <div v-for="func in functions">
