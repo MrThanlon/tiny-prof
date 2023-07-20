@@ -1,8 +1,8 @@
 <script setup>
-import Thread from './components/Thread.vue'
-import Function from './components/Function.vue'
-import {parse} from './utils/parse'
+import { FlameChart } from 'flame-chart-js'
+import { parse } from './utils/parse'
 import Module from './elfsym/elfsym.js'
+import { ref, onMounted } from 'vue'
 
 function fileToDataView (file) {
   return new Promise((resolve, reject) => {
@@ -22,12 +22,25 @@ function selectFile (func) {
   input.click()
 }
 
+let flameChart = null
+const flame = ref()
+
 /**
  * 
  * @param {DataView} data 
  */
 function openProfile(data) {
-  console.debug(parse(data))
+  const flameData = parse(data)
+  console.debug(flameData)
+  if (flameChart) {
+    flameChart.setData(flameData)
+  } else {
+    flameChart = new FlameChart({
+      canvas: flame.value,
+      data: flameData
+    })
+  }
+  console.debug(flameChart)
 }
 
 /**
@@ -44,27 +57,35 @@ async function addSymbols(data) {
   instance._free(buffer)
 }
 
+const functions = ['main', 'traceBegin']
+
 </script>
 
 <template>
-  <div class="stacks">
-    <Thread></Thread>
+  <div class="profile card">
+    <canvas ref="flame" width="800" height="600"></canvas>
   </div>
   <div class="pannel">
     <div class="file card">
       <button @click="selectFile(openProfile)">Open profile</button>
       <button @click="selectFile(addSymbols)">Add symbols</button>
+      <button @click="profile.push('cool')">test</button>
     </div>
     <div class="functions card">
-      <Function></Function>
+      <div v-for="func in functions">
+        {{ func }}
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.stacks {
+.profile {
   margin: 10px;
   flex-grow: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .pannel {

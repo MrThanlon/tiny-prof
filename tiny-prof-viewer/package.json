@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "flame-chart-js": "^2.3.1",
     "vue": "^3.3.4"
   },
   "devDependencies": {
