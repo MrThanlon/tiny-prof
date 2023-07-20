@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+src/elfsym/elfsym.js
+*.wasm
+src/elfsym/elfsym

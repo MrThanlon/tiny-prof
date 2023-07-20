@@ -3,22 +3,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#define _GNU_SOURCE
-#define __USE_GNU
-#include <dlfcn.h>
 
 #define MAX_LENGTH (1024 * 32)
 
-static const char* func2name(void* func) {
-    Dl_info info;
-    dladdr(func, &info);
-    return info.dli_sname;
-}
-
 struct call_info {
-    void* func;
     uint64_t time_usec; // the highest bit represent enter or exit
-};
+    void* func;
+} __attribute__((packed));
 
 static struct call_info* call_records;
 static uint32_t ptr = 0;
@@ -37,29 +28,14 @@ void __attribute__((constructor)) traceBegin(void) {
 void __attribute__((destructor)) traceEnd(void) {
     FILE* f = fopen("a.profile", "w");
     if (f) {
-        // name-addr table
-        uint32_t tb_len = 0;
-        long data_begin_pos = 0;
-        fseek(f, 4, SEEK_SET);
-        for (uint32_t i = 0; i < ptr; i++) {
-            for (uint32_t j = 0; j < i; j++) {
-                if (call_records[i].func == call_records[j].func) {
-                    // exist, ignore
-                    goto ignore;
-                }
-            }
-            // add a enity
-            fwrite(&call_records[i].func, 1, sizeof(void*), f);
-            const char* name = func2name(call_records[i].func);
-            fwrite(name, 1, strlen(name) + 1, f);
-            tb_len += 1;
-            ignore:
-            continue;
-        }
-        data_begin_pos = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        fwrite(&tb_len, 1, 4, f);
-        fseek(f, data_begin_pos, SEEK_SET);
+        // flag, indecate LE/BE
+        uint32_t flag = 0x9982;
+        fwrite(&flag, 1, 4, f);
+        // pointer size
+        uint32_t pointer_size = sizeof(void*);
+        fwrite(&pointer_size, 1, 4, f);
+        // the address of traceBegin
+        fwrite(&traceBegin, 1, sizeof(void*), f);
         // records
         fwrite(call_records, 1, sizeof(struct call_info) * ptr, f);
         fclose(f);
@@ -71,14 +47,12 @@ void __attribute__((destructor)) traceEnd(void) {
 }
 
 void __cyg_profile_func_enter(void *func, void *caller) {
-    //fprintf(stderr, "enter func: %s father: %s\n", func2name(func), func2name(caller));
     struct call_info* info = &call_records[ptr++];
     info->func = func;
-    info->time_usec = (1ULL << 63) & now();
+    info->time_usec = (1ULL << 63ULL) | now();
 }
 
 void __cyg_profile_func_exit(void *func, void *caller) {
-    //fprintf(stderr, "exit func: %s father: %s\n", func2name(func), func2name(caller));
     struct call_info* info = &call_records[ptr++];
     info->func = func;
     info->time_usec = now();

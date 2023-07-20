@@ -3,7 +3,7 @@
 
 <template>
     <div class="thread card">
-        abc
+        Thread view
     </div>
 </template>
 

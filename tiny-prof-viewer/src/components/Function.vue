@@ -3,7 +3,7 @@
 
 <template>
     <div class="function">
-        This is a function
+        Function view
     </div>
 </template>
 
