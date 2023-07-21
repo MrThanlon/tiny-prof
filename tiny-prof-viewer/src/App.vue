@@ -52,10 +52,10 @@ function openProfile(data) {
       canvas: flame.value,
       plugins: [
         new TimeGridPlugin(),
-        ...flameDataArray.flatMap(thread => {
+        ...flameDataArray.flatMap((thread, idx) => {
           return [
-            new TogglePlugin(`Thread ${thread[0]}`),
-            new FlameChartPlugin({ data: thread[1].frame, name: `Thread ${thread[0]}`})
+            new TogglePlugin(`Thread #${idx}`),
+            new FlameChartPlugin({ data: thread[1].frame, name: `Thread #${idx}`})
           ]
         })
       ],
