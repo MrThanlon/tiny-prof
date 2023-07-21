@@ -41,7 +41,14 @@ function openProfile(data) {
   } else {
     flameChart = new FlameChart({
       canvas: flame.value,
-      data: flameData
+      data: flameData,
+      settings: {
+        styles: {
+          main: {
+            backgroundColor: '#131313'
+          }
+        }
+      }
     })
   }
 }
@@ -63,20 +70,16 @@ async function addSymbols(data) {
   const outputDataView = new DataView(instance.HEAPU8.buffer)
   console.debug(outputDataView)
   let outputPtr = outputBuffer
+  const totalSymbols = outputDataView.getBigUint64(outputPtr, true)
+  outputPtr += 8
   const decoder = new TextDecoder()
-  let count = 0
-  while (true) {
+  for (let i = 0; i < totalSymbols; i++) {
     const addr = outputDataView.getBigUint64(outputPtr, true)
-    if (addr === 0n || count > 1024) {
-      break
-    }
     outputPtr += 8
     const nameLen = outputDataView.getUint8(outputPtr, true)
     outputPtr += 1
     const name = decoder.decode(outputDataView.buffer.slice(outputPtr, outputPtr + nameLen))
     outputPtr += nameLen
-    console.debug(addr.toString(16), name)
-    count += 1
     if (name === 'traceBegin') {
       console.debug(`traceBegin:${addr.toString(16)}`)
       symbolMap.traceBeginAddress = addr
@@ -86,7 +89,7 @@ async function addSymbols(data) {
   instance._free(outputBuffer)
   const fns = []
   symbolMap.map.forEach(v => fns.push(v))
-  functions.value = fns
+  functions.value = fns.sort((a, b) => a.localeCompare(b))
   console.debug(fns)
 }
 
@@ -94,7 +97,7 @@ async function addSymbols(data) {
 
 <template>
   <div class="profile card">
-    <canvas ref="flame" width="800" height="600"></canvas>
+    <canvas ref="flame" width="640" height="480"></canvas>
   </div>
   <div class="pannel">
     <div class="file card">
@@ -133,5 +136,6 @@ async function addSymbols(data) {
 
 .functions {
   flex-grow: 1;
+  overflow-y: overlay;
 }
 </style>

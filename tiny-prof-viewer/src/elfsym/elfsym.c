@@ -44,6 +44,8 @@ void* elfsym_load(const void* buffer, size_t size) {
     Elf64_Shdr *shdr = (Elf64_Shdr *)((char *)buffer + ehdr->e_shoff);
     struct malloc_buffer output_buf;
     malloc_buffer_init(&output_buf);
+    // first 8bit for num of symbols
+    output_buf.size += 8;
     for (int i = 0; i < ehdr->e_shnum; i++) {
         if (shdr[i].sh_type == SHT_SYMTAB) {
             #ifdef __EMSCRIPTEN__
@@ -70,6 +72,7 @@ void* elfsym_load(const void* buffer, size_t size) {
                 uint8_t name_len = strlen(name);
                 malloc_buffer_append(&output_buf, &name_len, 1);
                 malloc_buffer_append(&output_buf, name, name_len);
+                if (strcmp(name, "traceBegin") == 0)
                 #ifdef __EMSCRIPTEN__
                 printf("%08llx: %s\n",
                 #else
@@ -79,6 +82,13 @@ void* elfsym_load(const void* buffer, size_t size) {
                     name
                 );
             }
+            uint64_t total_symbols = shdr[i].sh_size / sizeof(Elf64_Sym);
+            #if __WORDSIZE == 64
+            printf("total symbols: %lu\n", total_symbols);
+            #else
+            printf("total symbols: %llu\n", total_symbols);
+            #endif
+            memcpy(output_buf.buffer, &total_symbols, 8);
             uint64_t end = 0;
             malloc_buffer_append(&output_buf, &end, sizeof(end));
             break;

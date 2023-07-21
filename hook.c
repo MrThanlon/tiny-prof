@@ -3,12 +3,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <pthread.h>
 
 #define MAX_LENGTH (1024 * 32)
 
 struct call_info {
     uint64_t time_usec; // the highest bit represent enter or exit
     void* func;
+    pthread_t pid;
 } __attribute__((packed));
 
 static struct call_info* call_records;
@@ -21,9 +23,9 @@ static uint64_t now(void) {
 }
 
 void __attribute__((constructor)) traceBegin(void) {
-    fprintf(stderr, "start profiling, build "__DATE__" "__TIME__"\n");
+    fprintf(stderr, "start profiling, build " __DATE__ " " __TIME__ "\n");
     fprintf(stderr, "traceBegin:%p\n", traceBegin);
-    call_records = malloc(sizeof(struct call_info) * MAX_LENGTH);
+    call_records = (struct call_info*)malloc(sizeof(struct call_info) * MAX_LENGTH);
 }
 
 void __attribute__((destructor)) traceEnd(void) {
@@ -41,7 +43,7 @@ void __attribute__((destructor)) traceEnd(void) {
         // records
         fwrite(call_records, 1, sizeof(struct call_info) * ptr, f);
         fclose(f);
-        fprintf(stderr, "end profiling, checkout a.profile\n");
+        fprintf(stderr, "end profiling, %u records, checkout a.profile\n", ptr);
     } else {
         perror("end profiling, can't open file to save");
     }
@@ -49,13 +51,25 @@ void __attribute__((destructor)) traceEnd(void) {
 }
 
 void __cyg_profile_func_enter(void *func, void *caller) {
-    struct call_info* info = &call_records[ptr++];
+    if (ptr >= MAX_LENGTH)
+        return;
+    struct call_info* info = &call_records[ptr];
+    if (!info)
+        return;
+    ptr++;
     info->func = func;
     info->time_usec = (1ULL << 63ULL) | now();
+    info->pid = pthread_self();
 }
 
 void __cyg_profile_func_exit(void *func, void *caller) {
-    struct call_info* info = &call_records[ptr++];
+    if (ptr >= MAX_LENGTH)
+        return;
+    struct call_info* info = &call_records[ptr];
+    if (!info)
+        return;
+    ptr++;
     info->func = func;
     info->time_usec = now();
+    info->pid = pthread_self();
 }

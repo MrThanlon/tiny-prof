@@ -2,7 +2,7 @@ function randomColor() {
     let ret = '#'
     for (let i = 0; i < 3; i++)
         ret += Math.round(Math.random() * 16).toString(16)
-    return ret
+    return '#ccc'
 }
 
 /**
@@ -28,11 +28,12 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
     console.debug(`pointerSize: ${pointerSize}`)
     // read traceBegin address
     const traceBeginAddress = profile.getBigUint64(8, isLittleEndian)
-    const funcOffset = traceBeginAddress - symbolMap.traceBeginAddress
+    const funcOffset = symbolMap.traceBeginAddress ? traceBeginAddress - symbolMap.traceBeginAddress : 0n
     console.debug(`traceBegin:${traceBeginAddress.toString(16)}, offset: ${funcOffset.toString(16)}`)
-    const ret = []
-    let currentFrame = null
     let startUsec = -1n
+    const threads = new Map()
+    let theTid = -1n
+
     for (let offset = 16; offset < profile.byteLength;) {
         // read time_usec
         const tu = profile.getBigUint64(offset, isLittleEndian)
@@ -45,39 +46,63 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
             func = profile.getUint32(offset, isLittleEndian) - funcOffset
         }
         offset += pointerSize
+        // read thread id
+        const tid = profile.getBigUint64(offset, isLittleEndian)
+        offset += 8
+
+        if (theTid < 0n) {
+            theTid = tid
+        }
+
         const timeUsec = tu & TIMEU_MASK
         if (tu & ENTER_MASK) {
             // enter func
             if (startUsec < 0n) {
                 startUsec = timeUsec
             }
-            console.debug('enter', func.toString(16), timeUsec - startUsec, )
-            const next_frame = {
+            console.debug(`ente thread ${tid} func ${func.toString(16)} at ${timeUsec - startUsec}`)
+
+            const frame = {
                 func,
                 name: symbolMap.map.get(func) || `<${func.toString(16)}>`,
                 start: Number(timeUsec - startUsec) / 1000,
                 duration: 0,
                 color: randomColor(),
-                caller: currentFrame,
+                caller: null,
                 children: []
             }
-            if (currentFrame) {
-                currentFrame.children.push(next_frame)
+            if (threads.has(tid)) {
+                // sub call
+                const thread = threads.get(tid)
+                if (thread.top) {
+                    frame.caller = thread.top
+                    frame.caller.children.push(frame)
+                } else {
+                    thread.frame.push(frame)
+                }
+                thread.top = frame
             } else {
-                // root
-                ret.push(next_frame)
+                // new thread
+                frame.caller = null
+                const thread = {
+                    frame: [frame],
+                    top: frame
+                }
+                threads.set(tid, thread)
             }
-            currentFrame = next_frame
         } else {
             // exit func
-            console.debug('exit', func.toString(16), timeUsec - startUsec)
-            if (func != currentFrame.func) {
-                // ???
-                console.warn(`expected exit func ${stacks[stacks.length - 1].func}, got ${func}, profile might not correct`)
+            const thread = threads.get(tid)
+            const frame = thread.top
+            console.debug(`exit thread ${tid} func ${func.toString(16)} at ${timeUsec - startUsec}`)
+            if (func != frame.func) {
+                // ??? broken stacks
+                console.warn(`expected exit func ${frame.func}, got ${func}, profile might not correct`)
             }
-            currentFrame.duration = Number(timeUsec - startUsec) / 1000 - currentFrame.start
-            currentFrame = currentFrame.caller
+            frame.duration = Number(timeUsec - startUsec) / 1000 - frame.start
+            thread.top = frame.caller
         }
     }
-    return ret
+    console.debug(theTid, threads)
+    return threads.get(theTid).frame
 }
