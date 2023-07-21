@@ -1,7 +1,8 @@
 test
 *.o
-a.profile
+*.profile
 compile_commands.json
 .cache
 .vscode
+test_cpp
 

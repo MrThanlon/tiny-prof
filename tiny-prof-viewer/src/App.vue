@@ -28,31 +28,35 @@ function selectFile (func) {
 }
 
 let flameChart = null
+const flameChartRefresh = ref(false)
 const flame = ref()
 const symbolMap = {
   traceBeginAddress: 0n,
   map: new Map()
 }
 
+const threadArray = ref([])
+
 /**
  * 
  * @param {DataView} data 
  */
 function openProfile(data) {
-  const flameData = parse(data, symbolMap)
-  console.debug(flameData)
-  const flameDataArray = Array.from(flameData)
-  const container = flame.value.parentElement
-  flame.value.width = container.offsetWidth
-  flame.value.height = container.offsetHeight
-  if (flameChart) {
-    //flameChart.setData(flameData)
-  } else {
-    flameChart = new FlameChartContainer({
+  const threadMap = parse(data, symbolMap)
+  console.debug(threadMap)
+  threadArray.value = Array.from(threadMap)
+  flameChartRefresh.value = false
+  setTimeout(() => {
+    flameChartRefresh.value = true
+    setTimeout(() => {
+    const container = flame.value.parentElement
+    flame.value.width = container.offsetWidth - 10
+    flame.value.height = container.offsetHeight - 10
+    const flameChart = new FlameChartContainer({
       canvas: flame.value,
       plugins: [
         new TimeGridPlugin(),
-        ...flameDataArray.flatMap((thread, idx) => {
+        ...threadArray.value.flatMap((thread, idx) => {
           return [
             new TogglePlugin(`Thread #${idx}`),
             new FlameChartPlugin({ data: thread[1].frame, name: `Thread #${idx}`})
@@ -62,12 +66,17 @@ function openProfile(data) {
       settings: {
         styles: {
           main: {
-            //backgroundColor: '#131313'
+            backgroundColor: '#131313',
+            fontColor: 'white'
+          },
+          timeGridPlugin: {
+            fontColor: 'white'
           }
         }
       }
     })
-  }
+  })
+  })
 }
 
 const functions = ref([])
@@ -114,13 +123,21 @@ async function addSymbols(data) {
 
 <template>
   <div class="profile card">
-    <canvas ref="flame"></canvas>
+    <canvas v-if="flameChartRefresh" ref="flame"></canvas>
   </div>
   <div class="pannel">
     <div class="file card">
       <button @click="selectFile(openProfile)">Open profile</button>
       <button @click="selectFile(addSymbols)">Add symbols</button>
       <p style="text-align: center;">Symbols: {{ functions.length }}</p>
+    </div>
+    <div class="thread card">
+      <p v-for="(thread, idx) in threadArray">
+        <label>
+          <input type="checkbox">
+          Thread #{{ idx }}
+        </label>
+      </p>
     </div>
     <div class="functions card">
     </div>
@@ -136,6 +153,7 @@ canvas {
 }
 .profile {
   margin: 10px;
+  margin-right: 0;
   padding: 0;
   flex-grow: 1;
   display: flex;
@@ -156,8 +174,14 @@ canvas {
   flex-direction: column;
 }
 
+.thread {
+  flex-grow: 1;
+  overflow-y: scroll;
+  margin-bottom: 10px;
+}
+
 .functions {
   flex-grow: 1;
-  overflow-y: overlay;
+  overflow-y: scroll;
 }
 </style>

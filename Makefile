@@ -8,10 +8,10 @@ run: test test_cpp
 	@./test_cpp
 
 test: test.o hook.o
-	$(CC) -g $^ -o $@
+	$(CC) -g $^ -o $@ -pthread
 
 test_cpp: test_cpp.o hook.o
-	$(CXX) -g $^ -o $@
+	$(CXX) -g $^ -o $@ -pthread
 
 test.o: test.c
 	$(CC) -Og -g -c $< -o $@ -finstrument-functions

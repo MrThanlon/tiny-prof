@@ -98,5 +98,5 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
             thread.top = frame.caller
         }
     }
-    return threads//.get(theTid).frame
+    return threads
 }
