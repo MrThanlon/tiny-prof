@@ -22,6 +22,7 @@ static uint64_t now(void) {
 
 void __attribute__((constructor)) traceBegin(void) {
     fprintf(stderr, "start profiling, build "__DATE__" "__TIME__"\n");
+    fprintf(stderr, "traceBegin:%p\n", traceBegin);
     call_records = malloc(sizeof(struct call_info) * MAX_LENGTH);
 }
 
@@ -35,7 +36,8 @@ void __attribute__((destructor)) traceEnd(void) {
         uint32_t pointer_size = sizeof(void*);
         fwrite(&pointer_size, 1, 4, f);
         // the address of traceBegin
-        fwrite(&traceBegin, 1, sizeof(void*), f);
+        size_t traceBeginAddress = (size_t)traceBegin;
+        fwrite(&traceBeginAddress, 1, sizeof(void*), f);
         // records
         fwrite(call_records, 1, sizeof(struct call_info) * ptr, f);
         fclose(f);

@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <elf.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,6 +8,28 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
+
+struct malloc_buffer {
+    size_t size;
+    size_t capacity;
+    char* buffer;
+};
+
+static void malloc_buffer_append(struct malloc_buffer* buffer, const void* appended, size_t size) {
+    if (buffer->capacity < buffer->size + size) {
+        // expand
+        buffer->capacity += size + 1024;
+        buffer->buffer = realloc(buffer->buffer, buffer->capacity);
+    }
+    memcpy(buffer->buffer + buffer->size, appended, size);
+    buffer->size += size;
+}
+
+static void malloc_buffer_init(struct malloc_buffer* buffer) {
+    buffer->size = 0;
+    buffer->capacity = 1024;
+    buffer->buffer = malloc(buffer->capacity);
+}
 
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
@@ -19,9 +42,8 @@ void* elfsym_load(const void* buffer, size_t size) {
     }
 
     Elf64_Shdr *shdr = (Elf64_Shdr *)((char *)buffer + ehdr->e_shoff);
-    unsigned long* output_buffer = malloc(1024);
-    size_t output_buffer_idx = 0;
-    size_t output_buffer_cap = 1024;
+    struct malloc_buffer output_buf;
+    malloc_buffer_init(&output_buf);
     for (int i = 0; i < ehdr->e_shnum; i++) {
         if (shdr[i].sh_type == SHT_SYMTAB) {
             #ifdef __EMSCRIPTEN__
@@ -39,19 +61,15 @@ void* elfsym_load(const void* buffer, size_t size) {
                     continue;
                 }
                 //append((char *)buffer + shdr[shdr[i].sh_link].sh_offset + sym[j].st_name, sym[j].st_value);
-                // append
-                if (output_buffer_idx + 1 >= output_buffer_cap) {
-                    output_buffer = realloc(output_buffer, output_buffer_cap + 1024);
-                    output_buffer_cap += 1024;
-                }
-                output_buffer[output_buffer_idx++] = sym[j].st_value;
+                // address
+                uint64_t addr = sym[j].st_value;
+                malloc_buffer_append(&output_buf, &addr, sizeof(uint64_t));
+
+                // name string
                 char* name = (char *)buffer + shdr[shdr[i].sh_link].sh_offset + sym[j].st_name;
-                if (output_buffer_idx + strlen(name) >= output_buffer_cap) {
-                    output_buffer = realloc(output_buffer, output_buffer_cap + 1024);
-                    output_buffer_cap += 1024;
-                }
-                memcpy(output_buffer + output_buffer_idx, name, strlen(name) + 1);
-                output_buffer_idx += strlen(name) + 1;
+                uint8_t name_len = strlen(name);
+                malloc_buffer_append(&output_buf, &name_len, 1);
+                malloc_buffer_append(&output_buf, name, name_len);
                 #ifdef __EMSCRIPTEN__
                 printf("%08llx: %s\n",
                 #else
@@ -61,9 +79,12 @@ void* elfsym_load(const void* buffer, size_t size) {
                     name
                 );
             }
+            uint64_t end = 0;
+            malloc_buffer_append(&output_buf, &end, sizeof(end));
+            break;
         }
     }
-    return output_buffer;
+    return output_buf.buffer;
 }
 
 #ifdef __EMSCRIPTEN__

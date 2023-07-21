@@ -43,7 +43,6 @@ button {
   min-height: 90vh;
   margin: 0 auto;
   display: flex;
-  flex-wrap: wrap;
 }
 
 @media (prefers-color-scheme: light) {

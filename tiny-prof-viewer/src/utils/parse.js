@@ -7,8 +7,9 @@ function randomColor() {
 
 /**
  * @param {DataView} profile
+ * @param {{ traceBeginAddress: BigInt; map: Map<BigInt, String>; }} [symbolMap={ traceBeginAddress: 0n, map: new Map()}] 
  */
-export function parse(profile) {
+export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map()}) {
     let isLittleEndian = true
     // read magic number
     const magic = profile.getUint32(0, isLittleEndian)
@@ -27,6 +28,8 @@ export function parse(profile) {
     console.debug(`pointerSize: ${pointerSize}`)
     // read traceBegin address
     const traceBeginAddress = profile.getBigUint64(8, isLittleEndian)
+    const funcOffset = traceBeginAddress - symbolMap.traceBeginAddress
+    console.debug(`traceBegin:${traceBeginAddress.toString(16)}, offset: ${funcOffset.toString(16)}`)
     const ret = []
     let currentFrame = null
     let startUsec = -1n
@@ -37,9 +40,9 @@ export function parse(profile) {
         // read func
         let func
         if (pointerSize == 8) {
-            func = profile.getBigUint64(offset, isLittleEndian)
+            func = profile.getBigUint64(offset, isLittleEndian) - funcOffset
         } else if (pointerSize == 4) {
-            func = profile.getUint32(offset, isLittleEndian)
+            func = profile.getUint32(offset, isLittleEndian) - funcOffset
         }
         offset += pointerSize
         const timeUsec = tu & TIMEU_MASK
@@ -48,10 +51,10 @@ export function parse(profile) {
             if (startUsec < 0n) {
                 startUsec = timeUsec
             }
-            console.debug('enter', func, timeUsec - startUsec)
+            console.debug('enter', func.toString(16), timeUsec - startUsec, )
             const next_frame = {
                 func,
-                name: `<${func.toString(16)}>`,
+                name: symbolMap.map.get(func) || `<${func.toString(16)}>`,
                 start: Number(timeUsec - startUsec) / 1000,
                 duration: 0,
                 color: randomColor(),
@@ -67,7 +70,7 @@ export function parse(profile) {
             currentFrame = next_frame
         } else {
             // exit func
-            console.debug('exit', func, timeUsec - startUsec)
+            console.debug('exit', func.toString(16), timeUsec - startUsec)
             if (func != currentFrame.func) {
                 // ???
                 console.warn(`expected exit func ${stacks[stacks.length - 1].func}, got ${func}, profile might not correct`)

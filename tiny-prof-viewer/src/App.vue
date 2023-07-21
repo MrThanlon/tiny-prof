@@ -24,13 +24,17 @@ function selectFile (func) {
 
 let flameChart = null
 const flame = ref()
+const symbolMap = {
+  traceBeginAddress: 0n,
+  map: new Map()
+}
 
 /**
  * 
  * @param {DataView} data 
  */
 function openProfile(data) {
-  const flameData = parse(data)
+  const flameData = parse(data, symbolMap)
   console.debug(flameData)
   if (flameChart) {
     flameChart.setData(flameData)
@@ -40,8 +44,9 @@ function openProfile(data) {
       data: flameData
     })
   }
-  console.debug(flameChart)
 }
+
+const functions = ref([])
 
 /**
  * 
@@ -51,13 +56,39 @@ async function addSymbols(data) {
   const instance = await Module()
   console.debug(instance)
   const buffer = instance._malloc(data.byteLength)
-  console.debug(buffer)
   instance.HEAPU8.set(new Uint8Array(data.buffer), buffer)
-  console.debug(instance._elfsym_load(buffer, data.byteLength))
+  const outputBuffer = instance._elfsym_load(buffer, data.byteLength)
   instance._free(buffer)
+  // parse symbols
+  const outputDataView = new DataView(instance.HEAPU8.buffer)
+  console.debug(outputDataView)
+  let outputPtr = outputBuffer
+  const decoder = new TextDecoder()
+  let count = 0
+  while (true) {
+    const addr = outputDataView.getBigUint64(outputPtr, true)
+    if (addr === 0n || count > 1024) {
+      break
+    }
+    outputPtr += 8
+    const nameLen = outputDataView.getUint8(outputPtr, true)
+    outputPtr += 1
+    const name = decoder.decode(outputDataView.buffer.slice(outputPtr, outputPtr + nameLen))
+    outputPtr += nameLen
+    console.debug(addr.toString(16), name)
+    count += 1
+    if (name === 'traceBegin') {
+      console.debug(`traceBegin:${addr.toString(16)}`)
+      symbolMap.traceBeginAddress = addr
+    }
+    symbolMap.map.set(addr, name)
+  }
+  instance._free(outputBuffer)
+  const fns = []
+  symbolMap.map.forEach(v => fns.push(v))
+  functions.value = fns
+  console.debug(fns)
 }
-
-const functions = ['main', 'traceBegin']
 
 </script>
 
