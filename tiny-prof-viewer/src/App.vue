@@ -1,5 +1,10 @@
 <script setup>
-import { FlameChart } from 'flame-chart-js'
+import {
+  FlameChart,
+  FlameChartContainer, TimeGridPlugin,
+  FlameChartPlugin, MarksPlugin,
+  UIPlugin, TogglePlugin
+} from 'flame-chart-js'
 import { parse } from './utils/parse'
 import Module from './elfsym/elfsym.js'
 import { ref, onMounted } from 'vue'
@@ -36,16 +41,28 @@ const symbolMap = {
 function openProfile(data) {
   const flameData = parse(data, symbolMap)
   console.debug(flameData)
+  const flameDataArray = Array.from(flameData)
+  const container = flame.value.parentElement
+  flame.value.width = container.offsetWidth
+  flame.value.height = container.offsetHeight
   if (flameChart) {
-    flameChart.setData(flameData)
+    //flameChart.setData(flameData)
   } else {
-    flameChart = new FlameChart({
+    flameChart = new FlameChartContainer({
       canvas: flame.value,
-      data: flameData,
+      plugins: [
+        new TimeGridPlugin(),
+        ...flameDataArray.flatMap(thread => {
+          return [
+            new TogglePlugin(`Thread ${thread[0]}`),
+            new FlameChartPlugin({ data: thread[1].frame, name: `Thread ${thread[0]}`})
+          ]
+        })
+      ],
       settings: {
         styles: {
           main: {
-            backgroundColor: '#131313'
+            //backgroundColor: '#131313'
           }
         }
       }
@@ -97,24 +114,29 @@ async function addSymbols(data) {
 
 <template>
   <div class="profile card">
-    <canvas ref="flame" width="640" height="480"></canvas>
+    <canvas ref="flame"></canvas>
   </div>
   <div class="pannel">
     <div class="file card">
       <button @click="selectFile(openProfile)">Open profile</button>
       <button @click="selectFile(addSymbols)">Add symbols</button>
+      <p style="text-align: center;">Symbols: {{ functions.length }}</p>
     </div>
     <div class="functions card">
-      <div v-for="func in functions">
-        {{ func }}
-      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+canvas {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
 .profile {
   margin: 10px;
+  padding: 0;
   flex-grow: 1;
   display: flex;
   justify-content: center;
@@ -125,7 +147,7 @@ async function addSymbols(data) {
   margin: 10px;
   display: flex;
   flex-direction: column;
-  min-width: 240px;
+  max-width: 240px;
 }
 
 .file {

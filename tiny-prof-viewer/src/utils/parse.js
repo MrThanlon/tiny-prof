@@ -32,7 +32,6 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
     console.debug(`traceBegin:${traceBeginAddress.toString(16)}, offset: ${funcOffset.toString(16)}`)
     let startUsec = -1n
     const threads = new Map()
-    let theTid = -1n
 
     for (let offset = 16; offset < profile.byteLength;) {
         // read time_usec
@@ -50,24 +49,20 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
         const tid = profile.getBigUint64(offset, isLittleEndian)
         offset += 8
 
-        if (theTid < 0n) {
-            theTid = tid
-        }
-
         const timeUsec = tu & TIMEU_MASK
         if (tu & ENTER_MASK) {
             // enter func
             if (startUsec < 0n) {
                 startUsec = timeUsec
             }
-            console.debug(`ente thread ${tid} func ${func.toString(16)} at ${timeUsec - startUsec}`)
+            //console.debug(`ente thread ${tid} func ${func.toString(16)} at ${timeUsec - startUsec}`)
 
             const frame = {
                 func,
                 name: symbolMap.map.get(func) || `<${func.toString(16)}>`,
                 start: Number(timeUsec - startUsec) / 1000,
                 duration: 0,
-                color: randomColor(),
+                //color: randomColor(),
                 caller: null,
                 children: []
             }
@@ -94,7 +89,7 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
             // exit func
             const thread = threads.get(tid)
             const frame = thread.top
-            console.debug(`exit thread ${tid} func ${func.toString(16)} at ${timeUsec - startUsec}`)
+            //console.debug(`exit thread ${tid} func ${func.toString(16)} at ${timeUsec - startUsec}`)
             if (func != frame.func) {
                 // ??? broken stacks
                 console.warn(`expected exit func ${frame.func}, got ${func}, profile might not correct`)
@@ -103,6 +98,5 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
             thread.top = frame.caller
         }
     }
-    console.debug(theTid, threads)
-    return threads.get(theTid).frame
+    return threads//.get(theTid).frame
 }

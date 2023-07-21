@@ -9,6 +9,8 @@
 #include <emscripten.h>
 #endif
 
+char* demangle(const char* mangled_name);
+
 struct malloc_buffer {
     size_t size;
     size_t capacity;
@@ -69,9 +71,18 @@ void* elfsym_load(const void* buffer, size_t size) {
 
                 // name string
                 char* name = (char *)buffer + shdr[shdr[i].sh_link].sh_offset + sym[j].st_name;
-                uint8_t name_len = strlen(name);
-                malloc_buffer_append(&output_buf, &name_len, 1);
-                malloc_buffer_append(&output_buf, name, name_len);
+                // demangle
+                char* demangled_name = demangle(name);
+                if (demangled_name) {
+                    uint8_t name_len = strlen(demangled_name);
+                    malloc_buffer_append(&output_buf, &name_len, 1);
+                    malloc_buffer_append(&output_buf, demangled_name, name_len);
+                    free(demangled_name);
+                } else {
+                    uint8_t name_len = strlen(name);
+                    malloc_buffer_append(&output_buf, &name_len, 1);
+                    malloc_buffer_append(&output_buf, name, name_len);
+                }
                 if (strcmp(name, "traceBegin") == 0)
                 #ifdef __EMSCRIPTEN__
                 printf("%08llx: %s\n",
