@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "flame-chart-js": "^2.3.1",
+    "split.js": "^1.6.5",
     "vue": "^3.3.4"
   },
   "devDependencies": {

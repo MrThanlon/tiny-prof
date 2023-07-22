@@ -1,4 +1,5 @@
 <script setup>
+import Split from 'split.js'
 import {
   FlameChart,
   FlameChartContainer, TimeGridPlugin,
@@ -28,7 +29,7 @@ function selectFile (func) {
 }
 
 let flameChart = null
-const flameChartRefresh = ref(false)
+const flameChartRefresh = ref(true)
 const flame = ref()
 const symbolMap = {
   traceBeginAddress: 0n,
@@ -36,6 +37,12 @@ const symbolMap = {
 }
 
 const threadArray = ref([])
+let plugins
+const profile = ref()
+const pannel = ref()
+const files = ref()
+const threads = ref()
+const functions = ref()
 
 /**
  * 
@@ -45,41 +52,38 @@ function openProfile(data) {
   const threadMap = parse(data, symbolMap)
   console.debug(threadMap)
   threadArray.value = Array.from(threadMap)
-  flameChartRefresh.value = false
-  setTimeout(() => {
-    flameChartRefresh.value = true
-    setTimeout(() => {
-    const container = flame.value.parentElement
-    flame.value.width = container.offsetWidth - 10
-    flame.value.height = container.offsetHeight - 10
-    const flameChart = new FlameChartContainer({
+  if (flameChart) {
+  } else {
+    flame.value.width = profile.value.offsetWidth
+    flame.value.height = profile.value.offsetHeight
+    plugins = threadArray.value.flatMap((thread, idx) => {
+      return [
+        new TogglePlugin(`Thread #${idx}`),
+        new FlameChartPlugin({ data: thread[1].frame, name: `Thread #${idx}`})
+      ]
+    })
+    flameChart = new FlameChartContainer({
       canvas: flame.value,
       plugins: [
         new TimeGridPlugin(),
-        ...threadArray.value.flatMap((thread, idx) => {
-          return [
-            new TogglePlugin(`Thread #${idx}`),
-            new FlameChartPlugin({ data: thread[1].frame, name: `Thread #${idx}`})
-          ]
-        })
+        ...plugins
       ],
       settings: {
         styles: {
           main: {
-            backgroundColor: '#131313',
-            fontColor: 'white'
+            //backgroundColor: '#131313',
+            //fontColor: 'white'
           },
           timeGridPlugin: {
-            fontColor: 'white'
+            //fontColor: 'white'
           }
         }
       }
     })
-  })
-  })
+  }
 }
 
-const functions = ref([])
+const symbols = ref([])
 
 /**
  * 
@@ -115,23 +119,35 @@ async function addSymbols(data) {
   instance._free(outputBuffer)
   const fns = []
   symbolMap.map.forEach(v => fns.push(v))
-  functions.value = fns.sort((a, b) => a.localeCompare(b))
+  symbols.value = fns.sort((a, b) => a.localeCompare(b))
   console.debug(fns)
 }
+
+onMounted(() => {
+  Split([profile.value, pannel.value], {
+    sizes: [70, 30],
+    snapOffset: 0
+  })
+  Split([files.value, threads.value, functions.value], {
+    direction: 'vertical',
+    minSize: 0,
+    snapOffset: 0
+  })
+})
 
 </script>
 
 <template>
-  <div class="profile card">
-    <canvas v-if="flameChartRefresh" ref="flame"></canvas>
+  <div ref="profile">
+    <canvas v-if="flameChartRefresh" ref="flame" width="800" height="600"></canvas>
   </div>
-  <div class="pannel">
-    <div class="file card">
+  <div class="pannel" ref="pannel">
+    <div class="files" ref="files">
       <button @click="selectFile(openProfile)">Open profile</button>
       <button @click="selectFile(addSymbols)">Add symbols</button>
-      <p style="text-align: center;">Symbols: {{ functions.length }}</p>
+      <p style="text-align: center;">Symbols: {{ symbols.length }}</p>
     </div>
-    <div class="thread card">
+    <div class="threads" ref="threads">
       <p v-for="(thread, idx) in threadArray">
         <label>
           <input type="checkbox">
@@ -139,42 +155,31 @@ async function addSymbols(data) {
         </label>
       </p>
     </div>
-    <div class="functions card">
+    <div class="functions" ref="functions">
     </div>
   </div>
 </template>
 
 <style scoped>
 canvas {
-  width: 100%;
-  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   margin: 0;
   padding: 0;
 }
-.profile {
-  margin: 10px;
-  margin-right: 0;
-  padding: 0;
-  flex-grow: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
 
 .pannel {
-  margin: 10px;
   display: flex;
   flex-direction: column;
-  max-width: 240px;
 }
 
-.file {
+.files {
   margin-bottom: 10px;
   display: flex;
   flex-direction: column;
 }
 
-.thread {
+.threads {
   flex-grow: 1;
   overflow-y: scroll;
   margin-bottom: 10px;
