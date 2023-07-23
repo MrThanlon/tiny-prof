@@ -135,6 +135,8 @@ onMounted(() => {
   })
 })
 
+const functionsOrder = ref({order: 'Name', direction: 'Down'})
+
 </script>
 
 <template>
@@ -156,6 +158,19 @@ onMounted(() => {
       </p>
     </div>
     <div class="functions" ref="functions">
+      <table>
+        <thead>
+          <tr>
+            <td class="table-index">Name&UpArrow;</td>
+            <td class="table-index">Calls</td>
+            <td class="table-index">Time</td>
+            <td class="table-index">Self</td>
+            <td class="table-index">Time/call</td>
+            <td class="table-index">Self/call</td>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
     </div>
   </div>
 </template>
@@ -166,6 +181,14 @@ canvas {
   max-height: 100%;
   margin: 0;
   padding: 0;
+}
+
+table {
+  width: 100%;
+}
+
+.table-index {
+  cursor: pointer;
 }
 
 .pannel {

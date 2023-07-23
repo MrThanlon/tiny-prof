@@ -7,69 +7,119 @@
 
 #define MAX_LENGTH (1024 * 32)
 
-struct call_info {
-    uint64_t time_usec; // the highest bit represent enter or exit
-    void* func;
-    pthread_t pid;
-} __attribute__((packed));
-
-static struct call_info* call_records;
-static uint32_t ptr = 0;
-
 static uint64_t now(void) {
+#ifdef __riscv
+    static volatile uint64_t time_elapsed = 0;
+    __asm__ __volatile__(
+        "rdtime %0"
+        : "=r"(time_elapsed));
+    return time_elapsed / 27;
+#else
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return tv.tv_sec * 1000000 + tv.tv_usec;
+#endif
 }
+
+static FILE* f;
+// TODO: optimize multi-thread to different buffer
+static pthread_mutex_t write_file_mutex;
 
 void __attribute__((constructor)) traceBegin(void) {
     fprintf(stderr, "start profiling, build " __DATE__ " " __TIME__ "\n");
     fprintf(stderr, "traceBegin:%p\n", traceBegin);
-    call_records = (struct call_info*)malloc(sizeof(struct call_info) * MAX_LENGTH);
-}
-
-void __attribute__((destructor)) traceEnd(void) {
-    FILE* f = fopen("a.profile", "w");
+    f = fopen("a.profile", "w");
     if (f) {
+        pthread_mutex_init(&write_file_mutex, NULL);
+        // TODO: multi-thread
         // flag, indecate LE/BE
         uint32_t flag = 0x9982;
         fwrite(&flag, 1, 4, f);
         // pointer size
-        uint32_t pointer_size = sizeof(void*);
-        fwrite(&pointer_size, 1, 4, f);
+        struct {
+            uint32_t pointer_size: 4;
+            uint32_t pthread_size: 4;
+        } sizes;
+        sizes.pointer_size = sizeof(void*);
+        sizes.pthread_size = sizeof(pthread_t);
+        fwrite(&sizes, 1, 4, f);
         // the address of traceBegin
         size_t traceBeginAddress = (size_t)traceBegin;
         fwrite(&traceBeginAddress, 1, sizeof(void*), f);
-        // records
-        fwrite(call_records, 1, sizeof(struct call_info) * ptr, f);
-        fclose(f);
-        fprintf(stderr, "end profiling, %u records, checkout a.profile\n", ptr);
     } else {
-        perror("end profiling, can't open file to save");
+        fprintf(stderr, "open a.profile error, profile will not be saved\n");
     }
-    free(call_records);
+}
+
+static uint32_t total_records = 0;
+
+void __attribute__((destructor)) traceEnd(void) {
+    if (f) {
+        pthread_mutex_destroy(&write_file_mutex);
+        // records
+        fclose(f);
+        fprintf(stderr, "end profiling, %u records, checkout a.profile\n", total_records);
+    }
+}
+
+struct call_info {
+    uint64_t time_usec; // the highest bit represent enter or exit
+    void* func;
+} __attribute__((packed));
+
+// record to it's own data struct
+#define RECORD_LENGTH (1024 * 32)
+struct thread_record_block {
+    pthread_t tid;
+    uint64_t records_size;
+    struct call_info records[];
+}__attribute__((packed));
+static __thread struct thread_record_block * trb = NULL;
+static __thread unsigned stacks = 0;
+
+static void write_file(void) {
+    pthread_mutex_lock(&write_file_mutex);
+    fwrite(trb, 1, sizeof(struct thread_record_block) + trb->records_size * sizeof(struct call_info), f);
+    pthread_mutex_unlock(&write_file_mutex);
+    trb->records_size = 0;
 }
 
 void __cyg_profile_func_enter(void *func, void *caller) {
-    if (ptr >= MAX_LENGTH)
+    if (!f) {
         return;
-    struct call_info* info = &call_records[ptr];
-    if (!info)
-        return;
-    ptr++;
-    info->func = func;
-    info->time_usec = (1ULL << 63ULL) | now();
-    info->pid = pthread_self();
+    }
+    if (trb == NULL) {
+        trb = malloc(sizeof(struct thread_record_block) + RECORD_LENGTH * sizeof(struct call_info));
+        trb->tid = pthread_self();
+        stacks = 0;
+        trb->records_size = 0;
+    }
+    if (trb->records_size >= RECORD_LENGTH) {
+        // save to file
+        write_file();
+    }
+    struct call_info* record = &trb->records[trb->records_size++];
+    record->func = func;
+    record->time_usec = (1UL << 63UL) | now();
+    stacks += 1;
+    __sync_fetch_and_add(&total_records, 1);
 }
 
 void __cyg_profile_func_exit(void *func, void *caller) {
-    if (ptr >= MAX_LENGTH)
+    if ((!f) || (trb == NULL)) {
         return;
-    struct call_info* info = &call_records[ptr];
-    if (!info)
-        return;
-    ptr++;
-    info->func = func;
-    info->time_usec = now();
-    info->pid = pthread_self();
+    }
+    if (trb->records_size >= RECORD_LENGTH) {
+        // save to file
+        write_file();
+    }
+    struct call_info* record = &trb->records[trb->records_size++];
+    record->func = func;
+    record->time_usec = now();
+    stacks -= 1;
+    if (stacks == 0) {
+        // thread end, write to file
+        write_file();
+    }
+    __sync_fetch_and_add(&total_records, 1);
 }
