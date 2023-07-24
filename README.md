@@ -12,6 +12,10 @@
 1. 线程挂起时不记录
 1. 对动态库支持不好
 
+## 原理
+
+GCC 使用 `-finstrument-functions` 可以对源码进行函数级打桩，在每个函数的开始前调用 `__cyg_profile_func_enter()`，返回前调用 `__cyg_profile_func_exit`，只要编写这两个函数就可以记录被打桩函数的运行时间。
+
 ## 使用方法
 
 1. 编译 `hook.c` 到 `hook.o`，可以使用 `-O3` 优化
