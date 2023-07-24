@@ -43,6 +43,7 @@ const pannel = ref()
 const files = ref()
 const threads = ref()
 const functions = ref()
+const statistics = ref([])
 
 /**
  * 
@@ -50,8 +51,11 @@ const functions = ref()
  */
 function openProfile(data) {
   const threadMap = parse(data, symbolMap)
-  console.debug(threadMap)
-  threadArray.value = Array.from(threadMap)
+  console.debug(threadMap.threads)
+  statistics.value = Array.from(threadMap.statistics)
+    .map(v => v[1])
+    .sort((a, b) => b.self - a.self)
+  threadArray.value = Array.from(threadMap.threads)
   if (flameChart) {
   } else {
     flame.value.width = profile.value.offsetWidth
@@ -161,15 +165,24 @@ const functionsOrder = ref({order: 'Name', direction: 'Down'})
       <table>
         <thead>
           <tr>
-            <td class="table-index">Name&UpArrow;</td>
+            <td class="table-index">Name</td>
             <td class="table-index">Calls</td>
-            <td class="table-index">Time</td>
-            <td class="table-index">Self</td>
-            <td class="table-index">Time/call</td>
+            <td class="table-index">Total</td>
+            <td class="table-index">Self&UpArrow;</td>
+            <td class="table-index">Total/call</td>
             <td class="table-index">Self/call</td>
           </tr>
         </thead>
-        <tbody></tbody>
+        <tbody>
+          <tr v-for="func in statistics">
+            <td>{{ func.name }}</td>
+            <td>{{ func.call }}</td>
+            <td>{{ func.total.toFixed(3) }}</td>
+            <td>{{ func.self.toFixed(3) }}</td>
+            <td>{{ (func.total / func.call).toFixed(3) }}</td>
+            <td>{{ (func.self / func.call).toFixed(3) }}</td>
+          </tr>
+        </tbody>
       </table>
     </div>
   </div>

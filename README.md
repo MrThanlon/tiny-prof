@@ -36,7 +36,7 @@ GCC 使用 `-finstrument-functions` 可以对源码进行函数级打桩，在�
 
 ## Roadmap
 
-- [ ] Statistics infomation
+- [x] Statistics infomation
 - [ ] Hide unselected threads
 - [ ] Shared library symbols
 - [ ] Optimize flame chart performance

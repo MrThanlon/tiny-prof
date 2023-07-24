@@ -113,15 +113,37 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
             }
         }
     }
-    // post process
+    const statistics = new Map()
+    // post process time from bigint to number
     threads.forEach(({ frame }, key) => {
-        frame.forEach(f => frameBigIntToNumber(f, startUsec))
+        frame.forEach(func => frameBigIntToNumber(func, startUsec))
+        frame.reduce(stat, statistics)
     })
-    return threads
+    // statistics
+    return { threads, statistics }
 }
 
-function frameBigIntToNumber (frame, startUsec) {
-    frame.start = Number(frame.start - startUsec) / 1000
-    frame.duration = Number(frame.duration) / 1000
-    frame.children.forEach((f => frameBigIntToNumber(f, startUsec)))
+function stat(stats, func) {
+    func.children.reduce(stat, stats)
+    const childrenDuration = func.children.reduce((pre, cur) => pre + cur.duration, 0)
+    if (stats.has(func.func)) {
+        const info = stats.get(func.func)
+        info.call += 1
+        info.total += func.duration
+        info.self += func.duration - childrenDuration
+    } else {
+        stats.set(func.func, {
+            name: func.name,
+            total: func.duration,
+            self: func.duration - childrenDuration,
+            call: 1
+        })
+    }
+    return stats
+}
+
+function frameBigIntToNumber (func, startUsec) {
+    func.start = Number(func.start - startUsec) / 1000
+    func.duration = Number(func.duration) / 1000
+    func.children.forEach((func => frameBigIntToNumber(func, startUsec)))
 }
