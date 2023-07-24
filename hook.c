@@ -7,6 +7,9 @@
 
 #define MAX_LENGTH (1024 * 32)
 
+#define DEBUG(...)
+#define INFO(...) fprintf(stderr,##__VA_ARGS__)
+
 static uint64_t now(void) {
 #ifdef __riscv
     static volatile uint64_t time_elapsed = 0;
@@ -26,8 +29,8 @@ static FILE* f;
 static pthread_mutex_t write_file_mutex;
 
 void __attribute__((constructor)) traceBegin(void) {
-    fprintf(stderr, "start profiling, build " __DATE__ " " __TIME__ "\n");
-    fprintf(stderr, "traceBegin:%p\n", traceBegin);
+    INFO("start profiling, build " __DATE__ " " __TIME__ "\n");
+    INFO("traceBegin:%p\n", traceBegin);
     f = fopen("a.profile", "w");
     if (f) {
         pthread_mutex_init(&write_file_mutex, NULL);
@@ -47,7 +50,7 @@ void __attribute__((constructor)) traceBegin(void) {
         size_t traceBeginAddress = (size_t)traceBegin;
         fwrite(&traceBeginAddress, 1, sizeof(void*), f);
     } else {
-        fprintf(stderr, "open a.profile error, profile will not be saved\n");
+        INFO("open a.profile error, profile will not be saved\n");
     }
 }
 
@@ -58,7 +61,7 @@ void __attribute__((destructor)) traceEnd(void) {
         pthread_mutex_destroy(&write_file_mutex);
         // records
         fclose(f);
-        fprintf(stderr, "end profiling, %u records, checkout a.profile\n", total_records);
+        INFO("end profiling, %u records, checkout a.profile\n", total_records);
     }
 }
 
@@ -78,9 +81,22 @@ static __thread struct thread_record_block * trb = NULL;
 static __thread unsigned stacks = 0;
 
 static void write_file(void) {
+    struct call_info wr_records[2] = {
+        {
+            .func = write_file,
+            .time_usec = (1UL << 63UL) | now()
+        }, {
+            .func = write_file,
+            .time_usec = 0
+        }
+    };
+    trb->records_size += 2;
     pthread_mutex_lock(&write_file_mutex);
-    fwrite(trb, 1, sizeof(struct thread_record_block) + trb->records_size * sizeof(struct call_info), f);
+    fwrite(trb, 1, sizeof(struct thread_record_block) + (trb->records_size - 2) * sizeof(struct call_info), f);
+    wr_records[1].time_usec = now();
+    fwrite(wr_records, 1, 2 * sizeof(struct call_info), f);
     pthread_mutex_unlock(&write_file_mutex);
+    DEBUG("write record of thread %lu\n", trb->tid);
     trb->records_size = 0;
 }
 
@@ -94,6 +110,7 @@ void __cyg_profile_func_enter(void *func, void *caller) {
         stacks = 0;
         trb->records_size = 0;
     }
+    DEBUG("thread %lu enter %p\n", trb->tid, func);
     if (trb->records_size >= RECORD_LENGTH) {
         // save to file
         write_file();
@@ -106,13 +123,14 @@ void __cyg_profile_func_enter(void *func, void *caller) {
 }
 
 void __cyg_profile_func_exit(void *func, void *caller) {
-    if ((!f) || (trb == NULL)) {
+    if ((!f) || (trb == NULL) || (stacks == 0)) {
         return;
     }
     if (trb->records_size >= RECORD_LENGTH) {
         // save to file
         write_file();
     }
+    DEBUG("thread %lu exit %p, stacks: %u\n", trb->tid, func, stacks);
     struct call_info* record = &trb->records[trb->records_size++];
     record->func = func;
     record->time_usec = now();

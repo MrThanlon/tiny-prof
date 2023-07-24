@@ -1,6 +1,7 @@
 #include <chrono>
 #include <iostream>
 #include <thread>
+#include <unistd.h>
 
 using namespace std;
 
@@ -21,10 +22,9 @@ static void t1_proc() {
 
 int main(void) {
     thread t1(t1_proc);
-    t1.detach();
     foo();
     this_thread::sleep_for(chrono::microseconds(500));
     bar();
-    //t1.join();
+    t1.join();
     return 0;
 }

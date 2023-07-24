@@ -98,7 +98,7 @@ async function addSymbols(data) {
   instance._free(buffer)
   // parse symbols
   const outputDataView = new DataView(instance.HEAPU8.buffer)
-  console.debug(outputDataView)
+  //console.debug(outputDataView)
   let outputPtr = outputBuffer
   const totalSymbols = outputDataView.getBigUint64(outputPtr, true)
   outputPtr += 8
@@ -120,7 +120,7 @@ async function addSymbols(data) {
   const fns = []
   symbolMap.map.forEach(v => fns.push(v))
   symbols.value = fns.sort((a, b) => a.localeCompare(b))
-  console.debug(fns)
+  //console.debug(fns)
 }
 
 onMounted(() => {

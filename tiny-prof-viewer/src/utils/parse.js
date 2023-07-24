@@ -78,7 +78,7 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
                 // enter func
                 if (startUsec > timeUsec) {
                     startUsec = timeUsec
-                }    
+                }
                 const frame = {
                     func,
                     name: symbolMap.map.get(func) || `<${func.toString(16)}>`,
@@ -95,12 +95,18 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
                 }
                 thread.top = frame
             } else {
+                if (!thread.top) {
+                    // ??? broken stacks
+                    console.warn(`expected enter func , got exit ${func}, stacks might be broken`)
+                    continue
+                }
                 // exit func
                 const frame = thread.top
                 //console.debug(`exit thread ${tid} func ${func.toString(16)} at ${timeUsec - startUsec}`)
                 if (func != frame.func) {
                     // ??? broken stacks
                     console.warn(`expected exit func ${frame.func}, got ${func}, stacks might be broken`)
+                    continue
                 }
                 frame.duration = timeUsec - frame.start
                 thread.top = frame.caller
