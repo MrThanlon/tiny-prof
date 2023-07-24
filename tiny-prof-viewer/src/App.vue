@@ -72,10 +72,10 @@ function openProfile(data) {
         styles: {
           main: {
             //backgroundColor: '#131313',
-            //fontColor: 'white'
+            //fontColor: '#ffffff'
           },
           timeGridPlugin: {
-            //fontColor: 'white'
+            //fontColor: '#ffffff'
           }
         }
       }

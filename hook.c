@@ -5,7 +5,7 @@
 #include <sys/time.h>
 #include <pthread.h>
 
-#define MAX_LENGTH (1024 * 32)
+#define RECORD_LENGTH (1024 * 32)
 
 #define DEBUG(...)
 #define INFO(...) fprintf(stderr,##__VA_ARGS__)
@@ -71,7 +71,6 @@ struct call_info {
 } __attribute__((packed));
 
 // record to it's own data struct
-#define RECORD_LENGTH (1024 * 32)
 struct thread_record_block {
     pthread_t tid;
     uint64_t records_size;
@@ -80,13 +79,13 @@ struct thread_record_block {
 static __thread struct thread_record_block * trb = NULL;
 static __thread unsigned stacks = 0;
 
-static void write_file(void) {
+void tiny_prof_record(void) {
     struct call_info wr_records[2] = {
         {
-            .func = write_file,
+            .func = tiny_prof_record,
             .time_usec = (1UL << 63UL) | now()
         }, {
-            .func = write_file,
+            .func = tiny_prof_record,
             .time_usec = 0
         }
     };
@@ -113,7 +112,7 @@ void __cyg_profile_func_enter(void *func, void *caller) {
     DEBUG("thread %lu enter %p\n", trb->tid, func);
     if (trb->records_size >= RECORD_LENGTH) {
         // save to file
-        write_file();
+        tiny_prof_record();
     }
     struct call_info* record = &trb->records[trb->records_size++];
     record->func = func;
@@ -128,7 +127,7 @@ void __cyg_profile_func_exit(void *func, void *caller) {
     }
     if (trb->records_size >= RECORD_LENGTH) {
         // save to file
-        write_file();
+        tiny_prof_record();
     }
     DEBUG("thread %lu exit %p, stacks: %u\n", trb->tid, func, stacks);
     struct call_info* record = &trb->records[trb->records_size++];
@@ -137,7 +136,7 @@ void __cyg_profile_func_exit(void *func, void *caller) {
     stacks -= 1;
     if (stacks == 0) {
         // thread end, write to file
-        write_file();
+        tiny_prof_record();
     }
     __sync_fetch_and_add(&total_records, 1);
 }
