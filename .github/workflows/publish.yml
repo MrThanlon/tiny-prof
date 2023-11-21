@@ -37,7 +37,7 @@ jobs:
         cd tiny-prof-viewer
         make -C src/elfsym
         npm run build -- --base=/tiny-prof --outDir=dist
-        npm run build -- --base=/ --outDir=dist2
+        npm run build -- --base=/ --outDir=html
 
     # Deploy
     - name: Deploy to GitHub Pages
@@ -53,4 +53,4 @@ jobs:
       with:
         name: html
         path: |
-          dist2
+          tiny-prof-viewer/html

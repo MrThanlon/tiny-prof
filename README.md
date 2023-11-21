@@ -24,7 +24,7 @@ GCC 使用 `-finstrument-functions` 可以对源码进行函数级打桩，在�
 1. 运行程序，如果在开始时打印了 `start profiling...` 则表示 tiny-prof 成功添加到程序中，程序正常退出时会打印 `end profiling, xxx records, checkout a.profile`，xxx表示记录的函数调用次数，同时生成 `a.profile` 文件
 1. 打开 [tiny-prof-viewer](https://mrthanlon.github.io/tiny-prof/)，或者从 GitHub Actions 的 Artifacts 中下载HTML文件部署到你自己的HTTP服务器中
 1. 点击右侧的 `Add symbols` 选择运行的可执行 ELF 文件，添加完成后下方的 Symbols 会显示加载了多少个符号
-1. 点击右侧的 `Open profile` 选择生成的 `a.profile` 文件，等待查看请加载
+1. 点击右侧的 `Open profile` 选择生成的 `a.profile` 文件，等待查看器加载
 
 ### 一些建议
 
@@ -41,3 +41,33 @@ GCC 使用 `-finstrument-functions` 可以对源码进行函数级打桩，在�
 - [ ] Shared library symbols
 - [ ] Optimize flame chart performance
 - [ ] Color
+
+## FAQ
+
+### 如何加载新的 Profile 文件？
+
+刷新页面。
+
+### 为什么只有函数地址没有函数名？
+
+先点击 `Add symbols` 再点击 `Open profile`，顺序不能错。
+
+### 如何记录标准库的函数调用？
+
+手动给函数调用添加 `__cyg_profile_func_enter()` 和 `__cyg_profile_func_exit()`，例如想要记录 `printf` 的调用情况，但 `printf` 是库函数不会被插桩，那就只能我们手动插了，如下
+
+```c
+int main(void) {
+    __cyg_profile_func_enter(printf, main);
+    printf("Hello World\n");
+    __cyg_profile_func_exit(printf, main);
+}
+```
+
+### `tiny_prof_record` 是什么？我没有调用这个函数呀？
+
+这是 tiny-prof 用来将内存中的记录写入到文件的函数，所以是的，这会对性能产生影响，就如量子力学中的测不准原理一样，性能分析也存在时间不准的情况，函数调用越是频繁这种误差就会越大。
+
+### tiny-prof 对性能有哪些影响？
+
+主要是记录函数调用，具体代码参见 `hook.c`，一次调用会记录32字节的数据（`2*sizeof(struct call_info)`，进入和退出分别16字节），默认的记录缓冲区大小为每个线程32768条记录，也就是512KB，可以修改 `hook.c` 中的 `RECORD_LENGTH` 宏来自定义大小，当写满缓冲区时会写入文件进行记录，也就是 `tiny_prof_record` 这个函数，当然也可以手动调用这个函数来清空记录缓冲区。
