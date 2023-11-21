@@ -30,6 +30,7 @@ jobs:
     - name: Build
       run: |
         cd tiny-prof-viewer
+        make -C src/elfsym
         npm run build --base=/tiny-prof
 
     # Deploy
