@@ -23,12 +23,17 @@ jobs:
     # Run install
     - name: Install
       run: |
-        cd tiny-prof-viewer
+        git clone https://github.com/emscripten-core/emsdk.git
+        cd emsdk
+        ./emsdk install latest
+        ./emsdk activate latest
+        cd ../tiny-prof-viewer
         npm install
 
     # Run build
     - name: Build
       run: |
+        source emsdk/emsdk_env.sh
         cd tiny-prof-viewer
         make -C src/elfsym
         npm run build --base=/tiny-prof
