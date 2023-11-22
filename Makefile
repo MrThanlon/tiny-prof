@@ -5,7 +5,9 @@ all: test test_cpp
 
 run: test test_cpp
 	@./test
+	mv a.profile test.profile
 	@./test_cpp
+	mv a.profile test_cpp.profile
 
 test: test.o hook.o
 	$(CC) -g $^ -o $@ -pthread -rdynamic -ldl

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "make -C src/elfsym && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

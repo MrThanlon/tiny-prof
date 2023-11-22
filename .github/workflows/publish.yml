@@ -35,7 +35,6 @@ jobs:
       run: |
         source emsdk/emsdk_env.sh
         cd tiny-prof-viewer
-        make -C src/elfsym
         npm run build -- --base=/tiny-prof --outDir=dist
         npm run build -- --base=/ --outDir=html
 
