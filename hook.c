@@ -8,7 +8,7 @@
 #define RECORD_LENGTH (1024 * 32)
 #define MAX_THREADS (32)
 
-#define DEBUG(...) fprintf(stderr,##__VA_ARGS__)
+#define DEBUG(...)// fprintf(stderr,##__VA_ARGS__)
 #define INFO(...) fprintf(stderr,##__VA_ARGS__)
 
 static uint64_t now(void) {
