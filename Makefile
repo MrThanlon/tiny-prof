@@ -18,7 +18,7 @@ test_cpp: test_cpp.o hook.o
 test.o: test.c
 	$(CC) -Og -g -c $< -o $@ -finstrument-functions
 
-test_cpp.o: test_cpp.cpp
+test_cpp.o: test.cpp
 	$(CXX) -Og -g -c $< -o $@ -finstrument-functions
 
 hook.o: hook.c

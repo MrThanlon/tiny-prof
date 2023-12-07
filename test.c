@@ -32,10 +32,19 @@ void* thread_task(void* data) {
     return NULL;
 }
 
+void* long_running_task(void* param) {
+    fprintf(stderr, "%s: %lu\n", __func__, pthread_self());
+    while (1) {
+        foo();
+    }
+    return NULL;
+}
+
 int main(void) {
     th = 1919810;
     printf("main th: %d\n", th);
-    pthread_t t1;
+    pthread_t t1, t2;
+    pthread_create(&t2, NULL, long_running_task, NULL);
     pthread_create(&t1, NULL, thread_task, NULL);
     foo();
     printf("main th: %d\n", th);
@@ -44,5 +53,7 @@ int main(void) {
     bar();
     func2name(NULL);
     printf("main th: %d\n", th);
+    sleep(1);
+    pthread_cancel(t2);
     return 0;
 }

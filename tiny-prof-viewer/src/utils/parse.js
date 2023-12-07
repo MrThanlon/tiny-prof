@@ -34,6 +34,7 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
     console.debug(`traceBegin:${traceBeginAddress.toString(16)}, offset: ${funcOffset.toString(16)}`)
 
     let startUsec = Infinity
+    let endUsec = 0n
     const threads = new Map()
 
     for (let offset = 16; offset < profile.byteLength;) {
@@ -74,6 +75,9 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
             }
             offset += pointerSize
             const timeUsec = tu & TIMEU_MASK
+            if (endUsec < timeUsec) {
+                endUsec = timeUsec
+            }
             if (tu & ENTER_MASK) {
                 // enter func
                 if (startUsec > timeUsec) {
@@ -83,7 +87,7 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
                     func,
                     name: symbolMap.map.get(func) || `<${func.toString(16)}>`,
                     start: timeUsec,
-                    duration: 0,
+                    duration: null,
                     //color: randomColor(),
                     caller: thread.top,
                     children: []
@@ -116,7 +120,7 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
     const statistics = new Map()
     // post process time from bigint to number
     threads.forEach(({ frame }, key) => {
-        frame.forEach(func => frameBigIntToNumber(func, startUsec))
+        frame.forEach(func => frameBigIntToNumber(func, startUsec, endUsec))
         frame.reduce(stat, statistics)
     })
     // statistics
@@ -142,8 +146,11 @@ function stat(stats, func) {
     return stats
 }
 
-function frameBigIntToNumber (func, startUsec) {
+function frameBigIntToNumber (func, startUsec, endUsec) {
+    if (func.duration === null) {
+        func.duration = endUsec - func.start
+    }
     func.start = Number(func.start - startUsec) / 1000
     func.duration = Number(func.duration) / 1000
-    func.children.forEach((func => frameBigIntToNumber(func, startUsec)))
+    func.children.forEach((func => frameBigIntToNumber(func, startUsec, endUsec)))
 }

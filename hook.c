@@ -6,8 +6,9 @@
 #include <pthread.h>
 
 #define RECORD_LENGTH (1024 * 32)
+#define MAX_THREADS (32)
 
-#define DEBUG(...)
+#define DEBUG(...) fprintf(stderr,##__VA_ARGS__)
 #define INFO(...) fprintf(stderr,##__VA_ARGS__)
 
 static uint64_t now(void) {
@@ -25,7 +26,6 @@ static uint64_t now(void) {
 }
 
 static FILE* f;
-// TODO: optimize multi-thread to different buffer
 static pthread_mutex_t write_file_mutex;
 
 void __attribute__((constructor)) traceBegin(void) {
@@ -56,15 +56,6 @@ void __attribute__((constructor)) traceBegin(void) {
 
 static uint32_t total_records = 0;
 
-void __attribute__((destructor)) traceEnd(void) {
-    if (f) {
-        pthread_mutex_destroy(&write_file_mutex);
-        // records
-        fclose(f);
-        INFO("end profiling, %u records, checkout a.profile\n", total_records);
-    }
-}
-
 struct call_info {
     uint64_t time_usec; // the highest bit represent enter or exit
     void* func;
@@ -76,8 +67,11 @@ struct thread_record_block {
     uint64_t records_size;
     struct call_info records[];
 }__attribute__((packed));
-static __thread struct thread_record_block * trb = NULL;
+static __thread struct thread_record_block* trb = NULL;
 static __thread unsigned stacks = 0;
+
+static uint32_t global_trb_size = 0;
+static struct thread_record_block* global_trbs[MAX_THREADS];
 
 void tiny_prof_record(void) {
     struct call_info wr_records[2] = {
@@ -99,15 +93,38 @@ void tiny_prof_record(void) {
     trb->records_size = 0;
 }
 
+void __attribute__((destructor)) traceEnd(void) {
+    if (f) {
+        pthread_mutex_destroy(&write_file_mutex);
+        // records all threads
+        for (uint32_t i = 0; i < global_trb_size; i++) {
+            struct thread_record_block* trb = global_trbs[i];
+            if (trb->records_size) {
+                fwrite(trb, 1, sizeof(struct thread_record_block) + trb->records_size * sizeof(struct call_info), f);
+                DEBUG("write record of thread %lu\n", trb->tid);
+            }
+        }
+        fclose(f);
+        INFO("end profiling, %u records, checkout a.profile\n", total_records);
+    }
+}
+
+static __thread char thread_first_call = 1;
+
 void __cyg_profile_func_enter(void *func, void *caller) {
     if (!f) {
         return;
+    }
+    if (thread_first_call) {
+        thread_first_call = 0;
     }
     if (trb == NULL) {
         trb = malloc(sizeof(struct thread_record_block) + RECORD_LENGTH * sizeof(struct call_info));
         trb->tid = pthread_self();
         stacks = 0;
         trb->records_size = 0;
+        uint32_t index = __sync_fetch_and_add(&global_trb_size, 1);
+        global_trbs[index] = trb;
     }
     DEBUG("thread %lu enter %p\n", trb->tid, func);
     if (trb->records_size >= RECORD_LENGTH) {

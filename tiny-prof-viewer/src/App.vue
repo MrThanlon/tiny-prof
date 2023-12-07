@@ -149,8 +149,8 @@ const functionsOrder = ref({order: 'Name', direction: 'Down'})
   </div>
   <div class="pannel" ref="pannel">
     <div class="files" ref="files">
-      <button @click="selectFile(openProfile)">Open profile</button>
       <button @click="selectFile(addSymbols)">Add symbols</button>
+      <button @click="selectFile(openProfile)">Open profile</button>
       <p style="text-align: center;">Symbols: {{ symbols.length }}</p>
     </div>
     <div class="threads" ref="threads">
