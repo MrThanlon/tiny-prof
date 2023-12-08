@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 function randomColor() {
     let ret = '#'
     for (let i = 0; i < 3; i++)

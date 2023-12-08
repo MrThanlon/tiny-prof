@@ -1,4 +1,5 @@
 <script setup>
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import Split from 'split.js'
 import {
   FlameChart,
