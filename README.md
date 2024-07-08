@@ -70,4 +70,4 @@ int main(void) {
 
 ### tiny-prof 对性能有哪些影响？
 
-主要是记录函数调用，具体代码参见 `hook.c`，一次调用会记录32字节的数据（`2*sizeof(struct call_info)`，进入和退出分别16字节），默认的记录缓冲区大小为每个线程32768条记录，也就是512KB，可以修改 `hook.c` 中的 `RECORD_LENGTH` 宏来自定义大小，当写满缓冲区时会写入文件进行记录，也就是 `tiny_prof_record` 这个函数，当然也可以手动调用这个函数来清空记录缓冲区。
+主要是记录函数调用，具体代码参见 `hook.c`，一次调用会记录32字节的数据（`2*sizeof(struct call_info)`，进入和退出分别16字节），默认的记录缓冲区大小为每个线程32768条记录，也就是512KB，可以修改 `hook.c` 中的 `PROF_RECORD_LENGTH` 宏来自定义大小，或者直接在编译时使用 `-DPROF_RECORD_LENGTH=xxx` 指定，当写满缓冲区时会写入文件进行记录，也就是 `tiny_prof_record` 这个函数，当然也可以手动调用这个函数来清空记录缓冲区。

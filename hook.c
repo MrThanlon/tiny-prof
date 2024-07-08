@@ -6,8 +6,13 @@
 #include <sys/time.h>
 #include <pthread.h>
 
-#define RECORD_LENGTH (1024 * 32)
-#define MAX_THREADS (32)
+#ifndef PROF_RECORD_LENGTH
+#define PROF_RECORD_LENGTH (1024 * 32)
+#endif
+
+#ifndef PROF_MAX_THREADS
+#define PROF_MAX_THREADS (32)
+#endif
 
 #define DEBUG(...)// fprintf(stderr,##__VA_ARGS__)
 #define INFO(...) fprintf(stderr,##__VA_ARGS__)
@@ -72,7 +77,7 @@ static __thread struct thread_record_block* trb = NULL;
 static __thread unsigned stacks = 0;
 
 static uint32_t global_trb_size = 0;
-static struct thread_record_block* global_trbs[MAX_THREADS];
+static struct thread_record_block* global_trbs[PROF_MAX_THREADS];
 
 void tiny_prof_record(void) {
     struct call_info wr_records[2] = {
@@ -120,7 +125,7 @@ void __cyg_profile_func_enter(void *func, void *caller) {
         thread_first_call = 0;
     }
     if (trb == NULL) {
-        trb = malloc(sizeof(struct thread_record_block) + RECORD_LENGTH * sizeof(struct call_info));
+        trb = malloc(sizeof(struct thread_record_block) + PROF_RECORD_LENGTH * sizeof(struct call_info));
         trb->tid = pthread_self();
         stacks = 0;
         trb->records_size = 0;
@@ -128,7 +133,7 @@ void __cyg_profile_func_enter(void *func, void *caller) {
         global_trbs[index] = trb;
     }
     DEBUG("thread %lu enter %p\n", trb->tid, func);
-    if (trb->records_size >= RECORD_LENGTH) {
+    if (trb->records_size >= PROF_RECORD_LENGTH) {
         // save to file
         tiny_prof_record();
     }
@@ -143,7 +148,7 @@ void __cyg_profile_func_exit(void *func, void *caller) {
     if ((!f) || (trb == NULL) || (stacks == 0)) {
         return;
     }
-    if (trb->records_size >= RECORD_LENGTH) {
+    if (trb->records_size >= PROF_RECORD_LENGTH) {
         // save to file
         tiny_prof_record();
     }
