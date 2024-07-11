@@ -7,7 +7,8 @@ import {
   FlameChartPlugin, MarksPlugin,
   UIPlugin, TogglePlugin
 } from 'flame-chart-js'
-import { parse } from './utils/parse'
+// import { parse } from './utils/parse'
+import Worker from './utils/worker?worker'
 import Module from './elfsym/elfsym.js'
 import { ref, onMounted } from 'vue'
 
@@ -46,46 +47,73 @@ const threads = ref()
 const functions = ref()
 const statistics = ref([])
 
+const worker = new Worker()
+
+/**
+ * @param {DataView} profile
+ * @param {{ traceBeginAddress: BigInt; map: Map<BigInt, String>; }} [symbolMap={ traceBeginAddress: 0n, map: new Map()}] 
+ */
+function parseInWorker(profile, symbolMap = { traceBeginAddress: 0n, map: new Map()}) {
+  worker.postMessage({ profile, symbolMap })
+  return new Promise((resolve, reject) => {
+    worker.onmessage = ({ data }) => {
+      if (data.ok) {
+        resolve(data.data)
+      } else {
+        reject(data.error)
+      }
+    }
+  })
+}
+
+const parsing = ref(false)
+
 /**
  * 
  * @param {DataView} data 
  */
-function openProfile(data) {
-  const threadMap = parse(data, symbolMap)
-  console.debug(threadMap.threads)
-  statistics.value = Array.from(threadMap.statistics)
-    .map(v => v[1])
-    .sort((a, b) => b.self - a.self)
-  threadArray.value = Array.from(threadMap.threads)
-  if (flameChart) {
-  } else {
-    flame.value.width = profile.value.offsetWidth
-    flame.value.height = profile.value.offsetHeight
-    plugins = threadArray.value.flatMap((thread, idx) => {
-      return [
-        new TogglePlugin(`Thread #${idx}`),
-        new FlameChartPlugin({ data: thread[1].frame, name: `Thread #${idx}`})
-      ]
-    })
-    flameChart = new FlameChartContainer({
-      canvas: flame.value,
-      plugins: [
-        new TimeGridPlugin(),
-        ...plugins
-      ],
-      settings: {
-        styles: {
-          main: {
-            //backgroundColor: '#131313',
-            //fontColor: '#ffffff'
-          },
-          timeGridPlugin: {
-            //fontColor: '#ffffff'
+async function openProfile(data) {
+  parsing.value = true
+  try {
+    const threadMap = await parseInWorker(data, symbolMap)
+    console.debug(threadMap.threads)
+    statistics.value = Array.from(threadMap.statistics)
+      .map(v => v[1])
+      .sort((a, b) => b.self - a.self)
+    threadArray.value = Array.from(threadMap.threads)
+    if (flameChart) {
+    } else {
+      flame.value.width = profile.value.offsetWidth
+      flame.value.height = profile.value.offsetHeight
+      plugins = threadArray.value.flatMap((thread, idx) => {
+        return [
+          new TogglePlugin(`Thread #${idx}`),
+          new FlameChartPlugin({ data: thread[1].frame, name: `Thread #${idx}`})
+        ]
+      })
+      flameChart = new FlameChartContainer({
+        canvas: flame.value,
+        plugins: [
+          new TimeGridPlugin(),
+          ...plugins
+        ],
+        settings: {
+          styles: {
+            main: {
+              //backgroundColor: '#131313',
+              //fontColor: '#ffffff'
+            },
+            timeGridPlugin: {
+              //fontColor: '#ffffff'
+            }
           }
         }
-      }
-    })
+      })
+    }
+  } catch (e) {
+    alert('Parse profile error: ' + e)
   }
+  parsing.value = false
 }
 
 const symbols = ref([])
@@ -150,8 +178,8 @@ const functionsOrder = ref({order: 'Name', direction: 'Down'})
   </div>
   <div class="pannel" ref="pannel">
     <div class="files" ref="files">
-      <button @click="selectFile(addSymbols)">Add symbols</button>
-      <button @click="selectFile(openProfile)">Open profile</button>
+      <button :disabled="parsing" @click="selectFile(addSymbols)">Add symbols</button>
+      <button :disabled="parsing" @click="selectFile(openProfile)">Open profile</button>
       <p style="text-align: center;">Symbols: {{ symbols.length }}</p>
     </div>
     <div class="threads" ref="threads">
