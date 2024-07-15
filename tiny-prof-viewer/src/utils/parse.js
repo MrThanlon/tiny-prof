@@ -8,9 +8,9 @@ function randomColor() {
 
 /**
  * @param {DataView} profile
- * @param {{ traceBeginAddress: BigInt; map: Map<BigInt, String>; }} [symbolMap={ traceBeginAddress: 0n, map: new Map()}] 
+ * @param {Map<BigInt, String>} [symbolMap=new Map()] 
  */
-export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map()}) {
+export function parse(profile, symbolMap = new Map()) {
     let isLittleEndian = true
     // read magic number
     const magic = profile.getUint32(0, isLittleEndian)
@@ -31,7 +31,13 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
     console.debug(`pointerSize: ${pointerSize}, pthreadSize: ${pthreadSize}`)
     // read traceBegin address
     const traceBeginAddress = profile.getBigUint64(8, isLittleEndian)
-    const funcOffset = symbolMap.traceBeginAddress ? traceBeginAddress - symbolMap.traceBeginAddress : 0n
+    let addr
+    symbolMap.forEach((v, k) => {
+        if (v === 'traceBegin') {
+            addr = k
+        }
+    })
+    const funcOffset = addr ? (traceBeginAddress - addr) : 0n
     console.debug(`traceBegin:${traceBeginAddress.toString(16)}, offset: ${funcOffset.toString(16)}`)
 
     let startUsec = Infinity
@@ -69,9 +75,9 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
             offset += 8
             // read func
             let func
-            if (pointerSize == 8) {
+            if (pointerSize === 8) {
                 func = profile.getBigUint64(offset, isLittleEndian) - funcOffset
-            } else if (pointerSize == 4) {
+            } else if (pointerSize === 4) {
                 func = profile.getUint32(offset, isLittleEndian) - funcOffset
             }
             offset += pointerSize
@@ -86,7 +92,7 @@ export function parse(profile, symbolMap = { traceBeginAddress: 0n, map: new Map
                 }
                 const frame = {
                     func,
-                    name: symbolMap.map.get(func) || `<${func.toString(16)}>`,
+                    name: symbolMap.get(func) || `<${func.toString(16)}>`,
                     start: timeUsec,
                     duration: null,
                     //color: randomColor(),

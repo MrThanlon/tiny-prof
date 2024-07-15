@@ -40,7 +40,6 @@ void __attribute__((constructor)) traceBegin(void) {
     f = fopen("a.profile", "w");
     if (f) {
         pthread_mutex_init(&write_file_mutex, NULL);
-        // TODO: multi-thread
         // flag, indecate LE/BE
         uint32_t flag = 0x9982;
         fwrite(&flag, 1, 4, f);

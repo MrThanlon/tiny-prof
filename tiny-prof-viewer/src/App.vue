@@ -33,10 +33,7 @@ function selectFile (func) {
 let flameChart = null
 const flameChartRefresh = ref(true)
 const flame = ref()
-const symbolMap = {
-  traceBeginAddress: 0n,
-  map: new Map()
-}
+const symbolMap = new Map()
 
 const threadArray = ref([])
 let plugins
@@ -51,9 +48,9 @@ const worker = new Worker()
 
 /**
  * @param {DataView} profile
- * @param {{ traceBeginAddress: BigInt; map: Map<BigInt, String>; }} [symbolMap={ traceBeginAddress: 0n, map: new Map()}] 
+ * @param {Map<BigInt, String>} [symbolMap=new Map()] 
  */
-function parseInWorker(profile, symbolMap = { traceBeginAddress: 0n, map: new Map()}) {
+function parseInWorker(profile, symbolMap = new Map()) {
   worker.postMessage({ profile, symbolMap })
   return new Promise((resolve, reject) => {
     worker.onmessage = ({ data }) => {
@@ -76,7 +73,6 @@ async function openProfile(data) {
   parsing.value = true
   try {
     const threadMap = await parseInWorker(data, symbolMap)
-    console.debug(threadMap.threads)
     statistics.value = Array.from(threadMap.statistics)
       .map(v => v[1])
       .sort((a, b) => b.self - a.self)
@@ -124,7 +120,6 @@ const symbols = ref([])
  */
 async function addSymbols(data) {
   const instance = await Module()
-  console.debug(instance)
   const buffer = instance._malloc(data.byteLength)
   instance.HEAPU8.set(new Uint8Array(data.buffer), buffer)
   const outputBuffer = instance._elfsym_load(buffer, data.byteLength)
@@ -143,15 +138,11 @@ async function addSymbols(data) {
     outputPtr += 1
     const name = decoder.decode(outputDataView.buffer.slice(outputPtr, outputPtr + nameLen))
     outputPtr += nameLen
-    if (name === 'traceBegin') {
-      console.debug(`traceBegin:${addr.toString(16)}`)
-      symbolMap.traceBeginAddress = addr
-    }
-    symbolMap.map.set(addr, name)
+    symbolMap.set(addr, name)
   }
   instance._free(outputBuffer)
   const fns = []
-  symbolMap.map.forEach(v => fns.push(v))
+  symbolMap.forEach(v => fns.push(v))
   symbols.value = fns.sort((a, b) => a.localeCompare(b))
   //console.debug(fns)
 }
